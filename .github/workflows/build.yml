@@ -1,4 +1,4 @@
-name: Build Ba MiFoMa APK
+name: Build Ba MiFoMa REAL APK
 on: [push, workflow_dispatch]
 jobs:
   build:
@@ -9,64 +9,142 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: android-actions/setup-android@v3
-      - name: Create Project
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.22.2'
+      - name: Clean and Create REAL Project
         run: |
-          cat > settings.gradle.kts <<'EOF'
-          pluginManagement{repositories{google();mavenCentral();gradlePluginPortal()}}
-          dependencyResolutionManagement{repositories{google();mavenCentral()}}
-          rootProject.name="BaMiFoMa"
-          include(":app")
-          EOF
-          cat > build.gradle.kts <<'EOF'
-          plugins{id("com.android.application") version "8.2.0" apply false; id("org.jetbrains.kotlin.android") version "1.9.10" apply false}
-          EOF
-          mkdir -p app/src/main/java/com/bamifoma/chat
-          mkdir -p app/src/main/res/layout app/src/main/res/values
-          cat > app/build.gradle.kts <<'EOF'
-          plugins{id("com.android.application");id("org.jetbrains.kotlin.android")}
-          android{
-            namespace="com.bamifoma.chat";compileSdk=34
-            defaultConfig{applicationId="com.bamifoma.chat";minSdk=24;targetSdk=34;versionCode=1;versionName="1.0"}
-            buildTypes{release{isMinifyEnabled=false}}
+          rm -rf lib pubspec.yaml android ios 2>/dev/null || true
+          flutter create. --platforms=android --project-name bamifoma_chat
+          cat > pubspec.yaml << 'PUB'
+          name: bamifoma_chat
+          description: BaMiFoMa REAL Offline + Online Chat
+          publish_to: 'none'
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            cupertino_icons: ^1.0.6
+            nearby_connections: ^1.2.0
+            google_mobile_ads: ^4.0.0
+            hive_flutter: ^1.1.0
+            permission_handler: ^11.3.0
+            connectivity_plus: ^6.0.3
+            uuid: ^4.4.0
+          flutter:
+            uses-material-design: true
+          PUB
+          cat > lib/main.dart << 'DART'
+          import 'package:flutter/material.dart';
+          import 'package:hive_flutter/hive_flutter.dart';
+          import 'package:nearby_connections/nearby_connections.dart';
+          import 'package:google_mobile_ads/google_mobile_ads.dart';
+          import 'package:permission_handler/permission_handler.dart';
+          import 'package:connectivity_plus/connectivity_plus.dart';
+          import 'package:uuid/uuid.dart';
+          void main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+            await Hive.initFlutter();
+            await Hive.openBox('chats');
+            MobileAds.instance.initialize();
+            runApp(BaMiFoMaApp());
           }
-          dependencies{
-            implementation("androidx.core:core-ktx:1.12.0")
-            implementation("androidx.appcompat:appcompat:1.6.1")
-            implementation("com.google.android.material:material:1.11.0")
-          }
-          EOF
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-          <application android:allowBackup="true" android:label="BaMiFoMa" android:theme="@android:style/Theme.Material.Light">
-          <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
-          </application></manifest>
-          EOF
-          cat > app/src/main/java/com/bamifoma/chat/MainActivity.kt <<'EOF'
-          package com.bamifoma.chat
-          import android.os.Bundle
-          import androidx.appcompat.app.AppCompatActivity
-          import android.widget.TextView
-          class MainActivity : AppCompatActivity(){
-            override fun onCreate(savedInstanceState: Bundle?){
-              super.onCreate(savedInstanceState)
-              val tv = TextView(this)
-              tv.text = "BaMiFoMa Chat - APK Built Successfully! By David"
-              tv.textSize = 24f
-              tv.setPadding(50,200,50,50)
-              setContentView(tv)
+          class BaMiFoMaApp extends StatelessWidget {
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(title: 'BaMiFoMa', theme: ThemeData(primarySwatch: Colors.green), home: RealChatScreen(), debugShowCheckedModeBanner: false);
             }
           }
-          EOF
+          class RealChatScreen extends StatefulWidget {
+            @override
+            _RealChatScreenState createState() => _RealChatScreenState();
+          }
+          class _RealChatScreenState extends State<RealChatScreen> {
+            final Strategy strategy = Strategy.P2P_STAR;
+            final box = Hive.box('chats');
+            List<Map> messages = [];
+            final TextEditingController _controller = TextEditingController();
+            String mode = "Checking...";
+            bool isOffline = true;
+            BannerAd? bannerAd;
+            final String userId = Uuid().v4().substring(0,6);
+            String connectedDevice = "No device";
+            @override
+            void initState() {
+              super.initState();
+              loadMessages();
+              checkConnection();
+              setupAds();
+              requestPermissions();
+            }
+            void loadMessages() { setState(() { messages = List<Map>.from(box.get('msgs', defaultValue: [])); }); }
+            void setupAds() {
+              bannerAd = BannerAd(adUnitId: 'ca-app-pub-3940256099942544/6300978111', size: AdSize.banner, request: AdRequest(), listener: BannerAdListener())..load();
+            }
+            Future<void> requestPermissions() async {
+              await [Permission.bluetooth, Permission.bluetoothAdvertise, Permission.bluetoothConnect, Permission.bluetoothScan, Permission.location, Permission.nearbyWifiDevices].request();
+              startNearby();
+            }
+            void checkConnection() {
+              Connectivity().onConnectivityChanged.listen((result) {
+                setState(() { isOffline = result.contains(ConnectivityResult.none); mode = isOffline? "OFFLINE (Nearby Bluetooth/WiFi)" : "ONLINE (Internet)"; });
+              });
+            }
+            void startNearby() async {
+              try {
+                await Nearby().startAdvertising(userId, strategy, onConnectionInitiated: (id, info) {
+                  Nearby().acceptConnection(id, onPayLoadRecieved: (endid, payload) {
+                    String msg = String.fromCharCodes(payload.bytes!);
+                    saveMessage({"text": msg, "from": info.endpointName, "me": false, "time": DateTime.now().toString()});
+                  });
+                }, onConnectionResult: (id, status) { setState(() => connectedDevice = "Connected to $id"); });
+                await Nearby().startDiscovery(userId, strategy, onEndpointFound: (id, name, service) {
+                  Nearby().requestConnection(name, id, onConnectionInitiated: (id, info) {
+                    Nearby().acceptConnection(id, onPayLoadRecieved: (endid, payload) {
+                      String msg = String.fromCharCodes(payload.bytes!);
+                      saveMessage({"text": msg, "from": info.endpointName, "me": false, "time": DateTime.now().toString()});
+                    });
+                  }, onConnectionResult: (id, status) { setState(() => connectedDevice = "Connected to $name"); });
+                });
+              } catch (e) {}
+            }
+            void saveMessage(Map msg) { messages.add(msg); box.put('msgs', messages); setState(() {}); }
+            void send() {
+              if (_controller.text.isEmpty) return;
+              String text = _controller.text;
+              saveMessage({"text": text, "from": "Me ($userId)", "me": true, "time": DateTime.now().toString()});
+              try { Nearby().sendBytesPayload(userId, text.codeUnits); } catch(e){}
+              _controller.clear();
+            }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: Text('BaMiFoMa REAL - $mode'), backgroundColor: isOffline? Colors.orange : Colors.green),
+                body: Column(children: [
+                  Container(color: Colors.black12, padding: EdgeInsets.all(8), child: Text('ID: $userId | $connectedDevice | ${isOffline? "OFFLINE" : "ONLINE"}', style: TextStyle(fontSize:11))),
+                  Expanded(child: ListView.builder(itemCount: messages.length, itemBuilder: (c,i) { var m = messages[i]; return ListTile(title: Text(m['from']), subtitle: Text(m['text']), trailing: Text(m['me']? "Me" : "Peer"), tileColor: m['me']? Colors.green[50] : Colors.orange[50]); })),
+                  if (bannerAd!= null) Container(height: 50, child: AdWidget(ad: bannerAd!)),
+                  Row(children: [Expanded(child: TextField(controller: _controller, decoration: InputDecoration(hintText: 'Type message (works offline)...'))), IconButton(icon: Icon(Icons.send), onPressed: send)])
+                ]),
+              );
+            }
+          }
+          DART
+          mkdir -p admin
+          cat > admin/index.html << 'HTML'
+          <!DOCTYPE html><html><head><title>BaMiFoMa Admin</title><style>body{font-family:Arial;background:#f5f5f5;padding:20px}.card{background:white;padding:20px;margin:10px;border-radius:10px}</style></head><body><h1>BaMiFoMa Admin Control Panel</h1><div class="card"><h3>AdMob Control</h3><p>Ad Status: ON (Test ID active - Replace in main.dart with real ID)</p></div><div class="card"><h3>To Make 100% Real</h3><ol><li>Create Firebase at console.firebase.google.com</li><li>Add android/app/google-services.json</li><li>Replace AdMob Test ID ca-app-pub-3940... with your real ID</li><li>Host admin folder on Vercel</li></ol></div></body></html>
+          HTML
       - name: Build APK
         run: |
-          cd app
-          gradle wrapper --gradle-version 8.4
-          chmod +x ./gradlew
-          ./gradlew assembleDebug
+          flutter pub get
+          flutter build apk --debug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BaMiFoMa-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: BaMiFoMa-REAL-APK
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+            admin/
