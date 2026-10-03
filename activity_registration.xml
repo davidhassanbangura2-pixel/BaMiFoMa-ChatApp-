@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:padding="24dp">
+        <TextView
+            android:id="@+id/register_back"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:text="‹  Back"
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="34dp"
+            android:text="Create your account"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="26dp"
+            android:text="Connect with people nearby—even when the internet is not."
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ba MiFoMa ID"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+        <EditText
+            android:id="@+id/register_id"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_input"
+            android:hint="BMF-1234"
+            android:inputType="textCapCharacters"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="BMF-1234"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:textSize="16sp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="Sierra Leone phone number"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+        <EditText
+            android:id="@+id/register_phone"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_input"
+            android:hint="+232 76 123456"
+            android:inputType="phone"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="+232 "
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:textSize="16sp" />
+        <TextView
+            android:id="@+id/register_continue"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="26dp"
+            android:background="@drawable/bg_primary_button"
+            android:gravity="center"
+            android:text="Continue"
+            android:textColor="@color/background"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center"
+            android:text="Demo flow only · phone verification needs a backend"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
+    </LinearLayout>
+</ScrollView>
