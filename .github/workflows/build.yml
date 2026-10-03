@@ -1,0 +1,23 @@
+name: Build BaMiFoMa APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Build APK
+        run: |
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/values
+          mv *.xml app/src/main/res/layout/ 2>/dev/null || true
+          mv AndroidManifest.xml app/src/main/ 2>/dev/null || true
+          echo "Structure fixed"
+      - name: Upload
+        run: echo "Build step will run after you add gradle files"
