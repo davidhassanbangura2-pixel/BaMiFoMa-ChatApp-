@@ -1,0 +1,118 @@
+name: Build Ba MiFoMa REAL APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Create REAL App
+        run: |
+          flutter create. --platforms=android --project-name bamifoma_chat --org com.bamifoma
+          cat > pubspec.yaml << 'PUB'
+          name: bamifoma_chat
+          description: BaMiFoMa REAL
+          publish_to: 'none'
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            cupertino_icons: ^1.0.6
+            nearby_connections: ^1.2.0
+            google_mobile_ads: ^4.0.0
+            hive_flutter: ^1.1.0
+            permission_handler: ^11.3.0
+            connectivity_plus: ^6.0.3
+            uuid: ^4.4.0
+          flutter:
+            uses-material-design: true
+          PUB
+          cat > lib/main.dart << 'DART'
+          import 'package:flutter/material.dart';
+          import 'package:hive_flutter/hive_flutter.dart';
+          import 'package:nearby_connections/nearby_connections.dart';
+          import 'package:google_mobile_ads/google_mobile_ads.dart';
+          import 'package:permission_handler/permission_handler.dart';
+          import 'package:connectivity_plus/connectivity_plus.dart';
+          import 'package:uuid/uuid.dart';
+          void main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+            await Hive.initFlutter();
+            await Hive.openBox('chats');
+            MobileAds.instance.initialize();
+            runApp(BaMiFoMaApp());
+          }
+          class BaMiFoMaApp extends StatelessWidget {
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(title: 'BaMiFoMa', theme: ThemeData(primarySwatch: Colors.green), home: RealChatScreen(), debugShowCheckedModeBanner: false);
+            }
+          }
+          class RealChatScreen extends StatefulWidget {
+            @override
+            _RealChatScreenState createState() => _RealChatScreenState();
+          }
+          class _RealChatScreenState extends State<RealChatScreen> {
+            final Strategy strategy = Strategy.P2P_STAR;
+            final box = Hive.box('chats');
+            List<Map> messages = [];
+            final _controller = TextEditingController();
+            String mode = "Checking...";
+            bool isOffline = true;
+            BannerAd? bannerAd;
+            final String userId = Uuid().v4().substring(0,6);
+            String connectedDevice = "Searching...";
+            @override
+            void initState() { super.initState(); loadMessages(); checkConnection(); setupAds(); requestPermissions(); }
+            void loadMessages() { setState(() { messages = List<Map>.from(box.get('msgs', defaultValue: [])); }); }
+            void setupAds() { bannerAd = BannerAd(adUnitId: 'ca-app-pub-3940256099942544/6300978111', size: AdSize.banner, request: AdRequest(), listener: BannerAdListener())..load(); }
+            Future<void> requestPermissions() async {
+              await [Permission.bluetooth, Permission.bluetoothAdvertise, Permission.bluetoothConnect, Permission.bluetoothScan, Permission.location, Permission.nearbyWifiDevices].request();
+              startNearby();
+            }
+            void checkConnection() { Connectivity().onConnectivityChanged.listen((r) { setState(() { isOffline = r.contains(ConnectivityResult.none); mode = isOffline? "OFFLINE - Nearby" : "ONLINE - Internet"; }); }); }
+            void startNearby() async {
+              try {
+                await Nearby().startAdvertising(userId, strategy, onConnectionInitiated: (id, info) {
+                  Nearby().acceptConnection(id, onPayLoadRecieved: (eid, p) { saveMessage({"text": String.fromCharCodes(p.bytes!), "from": info.endpointName, "me": false}); });
+                }, onConnectionResult: (id, s) { setState(() => connectedDevice = "Connected $id"); });
+                await Nearby().startDiscovery(userId, strategy, onEndpointFound: (id, name, service) {
+                  Nearby().requestConnection(name, id, onConnectionInitiated: (id, info) {
+                    Nearby().acceptConnection(id, onPayLoadRecieved: (eid, p) { saveMessage({"text": String.fromCharCodes(p.bytes!), "from": info.endpointName, "me": false}); });
+                  }, onConnectionResult: (id, s) { setState(() => connectedDevice = "Connected $name"); });
+                });
+              } catch(e){}
+            }
+            void saveMessage(Map m) { messages.add(m); box.put('msgs', messages); setState(() {}); }
+            void send() { if (_controller.text.isEmpty) return; saveMessage({"text": _controller.text, "from": "Me $userId", "me": true}); try { Nearby().sendBytesPayload(userId, _controller.text.codeUnits); } catch(e){} _controller.clear(); }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: Text('BaMiFoMa $mode'), backgroundColor: isOffline? Colors.orange : Colors.green),
+                body: Column(children: [
+                  Container(color: Colors.black12, padding: EdgeInsets.all(8), child: Text('ID: $userId | $connectedDevice | ${isOffline? "OFFLINE" : "ONLINE"}', style: TextStyle(fontSize:11))),
+                  Expanded(child: ListView.builder(itemCount: messages.length, itemBuilder: (c,i){ var m=messages[i]; return ListTile(title: Text(m['from']), subtitle: Text(m['text']), tileColor: m['me']? Colors.green[50] : Colors.orange[50]); })),
+                  if(bannerAd!=null) SizedBox(height:50, child: AdWidget(ad: bannerAd!)),
+                  Row(children: [Expanded(child: TextField(controller: _controller, decoration: InputDecoration(hintText: 'Type offline message...'))), IconButton(icon: Icon(Icons.send), onPressed: send)])
+                ]),
+              );
+            }
+          }
+          DART
+      - name: Build APK
+        run: |
+          flutter pub get
+          flutter build apk --debug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaMiFoMa-REAL-APK-FIXED
+          path: build/app/outputs/flutter-apk/app-debug.apk
