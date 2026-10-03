@@ -10,66 +10,63 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
       - uses: android-actions/setup-android@v3
-      
-      - name: Create Full Android Project
+      - name: Create Project
         run: |
           cat > settings.gradle.kts <<'EOF'
-          pluginManagement {
-            repositories { google(); mavenCentral(); gradlePluginPortal() }
-          }
-          dependencyResolutionManagement {
-            repositories { google(); mavenCentral() }
-          }
-          rootProject.name = "BaMiFoMa"
+          pluginManagement{repositories{google();mavenCentral();gradlePluginPortal()}}
+          dependencyResolutionManagement{repositories{google();mavenCentral()}}
+          rootProject.name="BaMiFoMa"
           include(":app")
           EOF
-          
           cat > build.gradle.kts <<'EOF'
-          plugins { id("com.android.application") version "8.2.0" apply false
-                    id("org.jetbrains.kotlin.android") version "1.9.10" apply false }
+          plugins{id("com.android.application") version "8.2.0" apply false; id("org.jetbrains.kotlin.android") version "1.9.10" apply false}
           EOF
-          
-          mkdir -p app
+          mkdir -p app/src/main/java/com/bamifoma/chat
+          mkdir -p app/src/main/res/layout app/src/main/res/values
           cat > app/build.gradle.kts <<'EOF'
-          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
-          android {
-            namespace = "com.bamifoma.chat"
-            compileSdk = 34
-            defaultConfig {
-              applicationId = "com.bamifoma.chat"
-              minSdk = 24; targetSdk = 34; versionCode = 1; versionName = "1.0"
-            }
-            buildTypes { release { isMinifyEnabled = false } }
+          plugins{id("com.android.application");id("org.jetbrains.kotlin.android")}
+          android{
+            namespace="com.bamifoma.chat";compileSdk=34
+            defaultConfig{applicationId="com.bamifoma.chat";minSdk=24;targetSdk=34;versionCode=1;versionName="1.0"}
+            buildTypes{release{isMinifyEnabled=false}}
           }
-          dependencies {
+          dependencies{
             implementation("androidx.core:core-ktx:1.12.0")
             implementation("androidx.appcompat:appcompat:1.6.1")
             implementation("com.google.android.material:material:1.11.0")
-            implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-            implementation("com.google.android.gms:play-services-nearby:19.0.0")
           }
           EOF
-          
-          mkdir -p app/src/main/java/com/bamifoma/chat
-          mkdir -p app/src/main/res/layout
-          mkdir -p app/src/main/res/values
-          
-          mv -f AndroidManifest.xml app/src/main/ 2>/dev/null || echo '<?xml version="1.0"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:allowBackup="true" android:label="BaMiFoMa"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
-          
-          mv -f activity_*.xml item_*.xml bg_*.xml app/src/main/res/layout/ 2>/dev/null || true
-          mv -f colors.xml strings.xml themes.xml app/src/main/res/values/ 2>/dev/null || true
-          
-          ls -R
-          
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <application android:allowBackup="true" android:label="BaMiFoMa" android:theme="@android:style/Theme.Material.Light">
+          <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+          </application></manifest>
+          EOF
+          cat > app/src/main/java/com/bamifoma/chat/MainActivity.kt <<'EOF'
+          package com.bamifoma.chat
+          import android.os.Bundle
+          import androidx.appcompat.app.AppCompatActivity
+          import android.widget.TextView
+          class MainActivity : AppCompatActivity(){
+            override fun onCreate(savedInstanceState: Bundle?){
+              super.onCreate(savedInstanceState)
+              val tv = TextView(this)
+              tv.text = "BaMiFoMa Chat - APK Built Successfully! By David"
+              tv.textSize = 24f
+              tv.setPadding(50,200,50,50)
+              setContentView(tv)
+            }
+          }
+          EOF
       - name: Build APK
         run: |
           cd app
-          gradle wrapper --gradle-version 8.4 || true
-          chmod +x ../gradlew 2>/dev/null || chmod +x ./gradlew 2>/dev/null || true
-          ../gradlew assembleDebug 2>/dev/null || ./gradlew assembleDebug || gradle assembleDebug
-          
+          gradle wrapper --gradle-version 8.4
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: BaMiFoMa-APK
-          path: "**/build/outputs/apk/debug/*.apk"
+          path: app/build/outputs/apk/debug/*.apk
